@@ -42,11 +42,12 @@ KeyFinder::KeyFinder(const secp256k1::uint256& startKey, const secp256k1::uint25
 	_randomStride = randomStride;
 	_continueAfterEnd = continueAfterEnd;
 	_randomSrtrideBits = randomSrtrideBits;
-	_rStrideCount = 0;
+	_rStrideCount = 1;
 	_rStrideHistory.clear();
 
 	if (_randomStride)
-		_stride = secp256k1::getRandom32(_randomSrtrideBits, _rStrideHistory);
+		_stride = secp256k1::getRandom64(_randomSrtrideBits, _rStrideHistory);
+	//Logger::log(LogLevel::Info, "Counting by : " + _stride.toString() + " (" + std::to_string(_stride.getBitRange()) + " bit)");
 }
 
 KeyFinder::~KeyFinder()
@@ -266,6 +267,7 @@ void KeyFinder::run()
 
 			}
 			else {
+				printf("\n");
 				Logger::log(LogLevel::Info, "Reached end of keyspace");
 				_running = false;
 			}
@@ -308,8 +310,9 @@ uint64_t KeyFinder::TZC(uint64_t x)
 
 void KeyFinder::reSetupEverything()
 {
-	_stride = secp256k1::getRandom32(_randomSrtrideBits, _rStrideHistory);
-	//Logger::log(LogLevel::Info, "Counting by: " + _stride.toString() + " (" + std::to_string(_stride.getBitRange()) + " bit)");
+	_stride = secp256k1::getRandom64(_randomSrtrideBits, _rStrideHistory);
+	//printf("\n");
+	//Logger::log(LogLevel::Info, "Counting by : " + _stride.toString() + " (" + std::to_string(_stride.getBitRange()) + " bit)");
 	_device->updateStride(_stride);
 	_rStrideCount++;
 }

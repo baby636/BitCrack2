@@ -1,6 +1,7 @@
 #include<string.h>
 #include<stdio.h>
 #include<stdlib.h>
+#include <regex>
 #include"../CryptoUtil/CryptoUtil.h"
 
 #include "secp256k1.h"
@@ -207,6 +208,56 @@ uint256 uint256::div(uint32_t val) const
 		::sub(t.v, k.v, t.v, 8);
 
 		quotient = quotient.add(uint256(2).pow(shiftCount));
+	}
+
+	return quotient;
+}
+
+
+uint256 uint256::div(const uint256& val) const
+{
+	uint256 t = *this;
+	uint256 quotient;
+
+	// Shift divisor left until MSB is 1
+	//uint32_t kWords[8] = { 0 };
+	//kWords[7] = val;
+	uint256 k0(val.v);
+	printf("\n%s ", k0.toString().c_str());
+
+	int shiftCount = 0 * 32;
+
+	for (int j = 0; j < 8; j++) {
+		if (k0.v[j] == 0) {
+			shiftCount += 32;
+		}
+		else {
+
+			while ((k0.v[j] & 0x80000000) == 0) {
+				k0.v[j] <<= 1;
+				shiftCount++;
+			}
+		}
+		//printf("%d: %d\n", j, shiftCount);
+	}
+	printf("%s \n", k0.toString().c_str());
+	//printf("completed: %d, %s %s\n", shiftCount, t.toString().c_str(), k0.toString().c_str());
+	uint256 k(k0.v);
+	//int kanha = 0;
+	// while t >= divisor
+	while (t.cmp(val) >= 0) {
+
+		// while t < k
+		while (t.cmp(k) < 0) {
+			// k = k / 2
+			k = rightShift(k, 1);
+			shiftCount--;
+		}
+		// t = t - k
+		::sub(t.v, k.v, t.v, 8);
+
+		quotient = quotient.add(uint256(2).pow(shiftCount));
+		//printf("hi: %d\n", kanha++);
 	}
 
 	return quotient;
@@ -623,6 +674,21 @@ uint256 secp256k1::multiplyModN(const uint256& a, const uint256& b)
 	return r;
 }
 
+
+static std::string removeLeadingZeros(std::string str)
+{
+	// Regex to remove leading
+	// zeros from a string
+	const std::regex pattern("^0+(?!$)");
+
+	// Replaces the matched
+	// value with given string
+	str = std::regex_replace(str, pattern, "");
+
+	return str;
+}
+
+
 std::string secp256k1::uint256::toString(int base)
 {
 	std::string s = "";
@@ -634,7 +700,7 @@ std::string secp256k1::uint256::toString(int base)
 		s += std::string(hex);
 	}
 
-	return s;
+	return removeLeadingZeros(s);
 }
 
 
@@ -931,39 +997,70 @@ uint256 secp256k1::getRandomRange(uint256 min, uint256 max)
 	return result.add(min);
 }
 
-uint256 secp256k1::getRandom32(int32_t bits, std::vector<uint32_t>& rStrideHistory)
+uint256 secp256k1::getRandom64(int32_t bits, std::vector<uint32_t>& rStrideHistory)
 {
 	uint256 result;
 
-	if (bits > 32 || bits < 1) {
+	if (bits > 64 || bits < 1) {
 		printf("uint256 wrong random bits\n");
 		exit(1);
 	}
 
-	uint32_t r = 0; // rnd.getChunk() | ((uint32_t)0x1UL << (bits - 1));
+	if (bits <= 32) {
+		uint32_t r = 0; // rnd.getChunk() | ((uint32_t)0x1UL << (bits - 1));
 
-	if (((uint64_t)0x1UL << bits) == rStrideHistory.size()) {
-		printf("Tried all possible value in %d bits for random stride\n", bits);
-		exit(0);
+		if (((uint64_t)0x1UL << bits) == rStrideHistory.size()) {
+			printf("Tried all possible value in %d bits for random stride\n", bits);
+			exit(0);
+		}
+
+		do {
+			r = rnd.getChunk() | ((uint32_t)0x1UL << (bits - 1));
+		} while (std::count(rStrideHistory.begin(), rStrideHistory.end(), r) > 0);
+
+		//printf("r = %lu, bits = %d\n", r, bits);
+
+		result.v[0] = (uint32_t)((uint32_t)MASK32 >> (32 - bits)) & r;
+		result.v[1] = 0UL;
+		result.v[2] = 0UL;
+		result.v[3] = 0UL;
+		result.v[4] = 0UL;
+		result.v[5] = 0UL;
+		result.v[6] = 0UL;
+		result.v[7] = 0UL;
+
+		rStrideHistory.push_back(r);
 	}
+	else {
+		uint32_t r1 = 0;
+		uint32_t r2 = 0;
 
-	do {
-		r = rnd.getChunk() | ((uint32_t)0x1UL << (bits - 1));
-	} while (std::count(rStrideHistory.begin(), rStrideHistory.end(), r) > 0);
+		if (((uint64_t)0x1UL << bits) == rStrideHistory.size()) {
+			printf("Tried all possible value in %d bits for random stride\n", bits);
+			exit(0);
+		}
 
-	//printf("r = %lu, bits = %d\n", r, bits);
+		do {
+			r1 = rnd.getChunk() | ((uint32_t)0x1UL << (bits - 1));
+		} while (std::count(rStrideHistory.begin(), rStrideHistory.end(), r1) > 0);
 
-	result.v[0] = (uint32_t)((uint32_t)MASK32 >> (32 - bits)) & r;
-	result.v[1] = 0UL;
-	result.v[2] = 0UL;
-	result.v[3] = 0UL;
-	result.v[4] = 0UL;
-	result.v[5] = 0UL;
-	result.v[6] = 0UL;
-	result.v[7] = 0UL;
+		do {
+			r2 = rnd.getChunk() | ((uint32_t)0x1UL << (bits - 1));
+		} while (std::count(rStrideHistory.begin(), rStrideHistory.end(), r2) > 0);
+		//printf("r = %lu, bits = %d\n", r, bits);
 
-	rStrideHistory.push_back(r);
+		result.v[0] = r1;
+		result.v[1] = (uint32_t)((uint32_t)MASK32 >> (32 - (bits - 32))) & r2;
+		result.v[2] = 0UL;
+		result.v[3] = 0UL;
+		result.v[4] = 0UL;
+		result.v[5] = 0UL;
+		result.v[6] = 0UL;
+		result.v[7] = 0UL;
 
+		rStrideHistory.push_back(r1);
+		rStrideHistory.push_back(r2);
+	}
 	return result;
 }
 

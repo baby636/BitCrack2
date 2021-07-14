@@ -207,11 +207,17 @@ namespace secp256k1 {
 
 		uint256 div(uint32_t val) const;
 
+		uint256 div(const uint256& val) const;
+
 		uint256 mod(uint32_t val) const;
 
 		unsigned int toInt32() const
 		{
 			return this->v[0];
+		}
+		unsigned long long int toInt64() const
+		{
+			return this->v[0] | (unsigned long long int)this->v[1] << 32;
 		}
 
 		bool isZero() const
@@ -314,7 +320,7 @@ namespace secp256k1 {
 
 	static Random rnd;
 	uint256 getRandomRange(uint256 min, uint256 max);
-	uint256 getRandom32(int32_t bits, std::vector<uint32_t> &rStrideHistory);
+	uint256 getRandom64(int32_t bits, std::vector<uint32_t> &rStrideHistory);
 
 	const unsigned int _POINT_AT_INFINITY_WORDS[8] = { 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF };
 	const unsigned int _P_WORDS[8] = { 0xFFFFFC2F, 0xFFFFFFFE, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF };

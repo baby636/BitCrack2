@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <fstream>
 #include <iostream>
+#include <regex>
 
 #include "KeyFinder/KeyFinder.h"
 #include "AddrUtil/AddressUtil.h"
@@ -13,7 +14,10 @@
 
 #include "CudaDevice/CudaKeySearchDevice.h"
 
-#define RELEASE "1.01"
+#include <gmp.h>
+#include <gmpxx.h>
+
+#define RELEASE "1.02"
 
 typedef struct _RunConfig {
 	// startKey is the first key. We store it so that if the --continue
@@ -44,7 +48,7 @@ typedef struct _RunConfig {
 
 	int device = 0;
 
-	std::string resultsFile = "";
+	std::string resultsFile = "Found.txt";
 
 	uint64_t totalkeys = 0;
 	unsigned int elapsed = 0;
@@ -68,6 +72,19 @@ static uint64_t _lastUpdate = 0;
 static uint64_t _runningTime = 0;
 static uint64_t _startTime = 0;
 
+
+// ((input - min) * 100) / (max - min)
+double getPercantage(const secp256k1::uint256& val)
+{
+	mpz_class x(((secp256k1::uint256)val).toString().c_str(), 16);
+	mpz_class r(_config.range.toString().c_str(), 16);
+	x = x - mpz_class(_config.startKey.toString().c_str(), 16);
+	x = x * 100;
+	mpf_class y(x);
+	y = y / mpf_class(r);
+	return y.get_d();
+}
+
 /**
 * Callback to display the private key
 */
@@ -80,7 +97,7 @@ void resultCallback(KeySearchResult info)
 		std::string s = info.address + " " + info.privateKey.toString(16) + " " + info.publicKey.toString(info.compressed);
 		util::appendToFile(_config.resultsFile, s);
 
-		return;
+		//return;
 	}
 
 	std::string logStr = "Address     : " + info.address + "\n";
@@ -112,30 +129,16 @@ Callback to display progress
 */
 void statusCallback(KeySearchStatus info)
 {
-	std::string speedStr = std::string("SPEED: ");
+	std::string speedStr;// = std::string("SPEED: ");
 
 	if (info.speed < 0.01) {
-		speedStr += "< 0.01 MKey/s";
+		speedStr = "< 0.01 MK/s";
 	}
 	else {
-		speedStr += util::format("%.2f", info.speed) + " MKey/s";
+		speedStr = util::format("%.2f", info.speed) + " MK/s";
 	}
-	//secp256k1::uint256 completed(_config.totalkeys + info.total);
-	//secp256k1::uint256 remaining = _config.range;
-	//remaining = remaining.sub(completed);
 
-	//secp256k1::uint256 sspeed((uint64_t)((uint64_t)((uint64_t)info.speed) * 1000000));
-	//sspeed = sspeed.mul(info.stride);
-
-	//remaining = remaining.div(sspeed.toInt32());
-
-	//auto remaining_seconds = remaining.toUint64();
-
-	//std::string remSeconds = util::GetTimeStr((double)remaining_seconds);
-
-	//std::string totalStr = "(" + util::formatThousands(_config.totalkeys + info.total) + " total)";
-
-	std::string totalStr = std::string("TOTAL: ") + util::formatThousands(_config.totalkeys + info.total);
+	std::string totalStr = util::formatThousands(_config.totalkeys + info.total);
 
 	std::string timeStr = util::formatSeconds((unsigned int)((_config.elapsed + info.totalTime) / 1000));
 
@@ -143,9 +146,7 @@ void statusCallback(KeySearchStatus info)
 
 	std::string totalMemStr = util::format(info.deviceMemory / (1024 * 1024));
 
-	//std::string targetStr = util::format(info.targets) + " target" + (info.targets > 1 ? "s" : "");
-
-	std::string targetStr = std::string("TARGET") + (info.targets > 1 ? "S: " : ": ") + util::format(info.targets);
+	std::string targetStr = util::format(info.targets);
 
 	// Fit device name in 16 characters, pad with spaces if less
 	std::string devName = info.deviceName.substr(0, 16);
@@ -154,14 +155,16 @@ void statusCallback(KeySearchStatus info)
 	const char* formatStr = NULL;
 
 	if (_config.follow) {
-		formatStr = "[DEV: %s %s/%sMB] [%s (%d bit)] [INC: %lX, %lu] [%s] [%s] [%s] [%s]\n";
+		formatStr = "[DEV: %s %s/%sMB] [K: %s (%d bit), C: %lf %%] [I: %llX (%d bit), %lu] [T: %s] [S: %s] [%s (%d bit)] [%s]\n";
 	}
 	else {
-		formatStr = "\r[DEV: %s %s/%sMB] [%s (%d bit)] [INC: %lX, %lu] [%s] [%s] [%s] [%s]";
+		formatStr = "\r[DEV: %s %s/%sMB] [K: %s (%d bit), C: %lf %%] [I: %llX (%d bit), %lu] [T: %s] [S: %s] [%s (%d bit)] [%s] ";
 	}
 
 	printf(formatStr, devName.c_str(), usedMemStr.c_str(), totalMemStr.c_str(), info.nextKey.toString().c_str(),
-		info.nextKey.getBitRange(), info.stride.toInt32(), info.rStrideCount, targetStr.c_str(), speedStr.c_str(), totalStr.c_str(), timeStr.c_str());
+		info.nextKey.getBitRange(), getPercantage(info.nextKey), info.stride.toInt64(), info.stride.getBitRange(), 
+		info.rStrideCount, targetStr.c_str(), speedStr.c_str(), totalStr.c_str(), 
+		secp256k1::uint256(_config.totalkeys + info.total).getBitRange(), timeStr.c_str());
 
 	if (_config.checkpointFile.length() > 0) {
 		uint64_t t = util::getSystemTime();
