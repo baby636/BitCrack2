@@ -213,57 +213,6 @@ uint256 uint256::div(uint32_t val) const
 	return quotient;
 }
 
-
-uint256 uint256::div(const uint256& val) const
-{
-	uint256 t = *this;
-	uint256 quotient;
-
-	// Shift divisor left until MSB is 1
-	//uint32_t kWords[8] = { 0 };
-	//kWords[7] = val;
-	uint256 k0(val.v);
-	printf("\n%s ", k0.toString().c_str());
-
-	int shiftCount = 0 * 32;
-
-	for (int j = 0; j < 8; j++) {
-		if (k0.v[j] == 0) {
-			shiftCount += 32;
-		}
-		else {
-
-			while ((k0.v[j] & 0x80000000) == 0) {
-				k0.v[j] <<= 1;
-				shiftCount++;
-			}
-		}
-		//printf("%d: %d\n", j, shiftCount);
-	}
-	printf("%s \n", k0.toString().c_str());
-	//printf("completed: %d, %s %s\n", shiftCount, t.toString().c_str(), k0.toString().c_str());
-	uint256 k(k0.v);
-	//int kanha = 0;
-	// while t >= divisor
-	while (t.cmp(val) >= 0) {
-
-		// while t < k
-		while (t.cmp(k) < 0) {
-			// k = k / 2
-			k = rightShift(k, 1);
-			shiftCount--;
-		}
-		// t = t - k
-		::sub(t.v, k.v, t.v, 8);
-
-		quotient = quotient.add(uint256(2).pow(shiftCount));
-		//printf("hi: %d\n", kanha++);
-	}
-
-	return quotient;
-}
-
-
 uint256 uint256::mod(uint32_t val) const
 {
 	uint256 quotient = this->div(val);
