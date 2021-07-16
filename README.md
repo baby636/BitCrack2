@@ -88,7 +88,20 @@ BitCrack.exe -b 64 -t 256 -p 1024 --rstride 5 --keyspace 400000000:1FFFFFFFFF 1P
 ### Windows
 - Microsoft Visual Studio Community 2019
 - CUDA version 10.0
+## Linux
+- Install libgmp: ```sudo apt install -y libgmp-dev```
 
+- Edit the makefile and set up the appropriate CUDA SDK and compiler paths for nvcc.
+
+    ```make
+    CUDA       = /usr/local/cuda-11.0
+    CXXCUDA    = /usr/bin/g++
+    ```
+ - To build with CUDA: pass CCAP value according to your GPU compute capability
+    ```sh
+    $ cd BitCrack
+    $ make CCAP=75 all
+    ```
 
 # License
 BitCrack is licensed under MIT License.
