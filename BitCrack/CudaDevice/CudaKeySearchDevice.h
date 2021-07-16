@@ -8,7 +8,7 @@
 #include "CudaDeviceKeys.h"
 #include "CudaHashLookup.h"
 #include "CudaAtomicList.h"
-#include "../cudaUtil/cudaUtil.h"
+#include "../CudaUtil/cudaUtil.h"
 
 // Structures that exist on both host and device side
 struct CudaDeviceResult {
