@@ -122,9 +122,6 @@
     <ClCompile Include="CryptoUtil\checksum.cpp">
       <Filter>CryptoUtil</Filter>
     </ClCompile>
-    <ClCompile Include="CryptoUtil\hash.cpp">
-      <Filter>CryptoUtil</Filter>
-    </ClCompile>
     <ClCompile Include="CryptoUtil\ripemd160.cpp">
       <Filter>CryptoUtil</Filter>
     </ClCompile>

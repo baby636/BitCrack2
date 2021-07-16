@@ -6,7 +6,6 @@ SRC =   AddrUtil/Base58.cpp                \
         AddrUtil/hash.cpp                  \
         CmdParse/CmdParse.cpp              \
         CryptoUtil/checksum.cpp            \
-        CryptoUtil/hash.cpp                \
         CryptoUtil/ripemd160.cpp           \
         CryptoUtil/Rng.cpp                 \
         CryptoUtil/sha256.cpp              \
@@ -27,7 +26,6 @@ OBJET = $(addprefix $(OBJDIR)/,            \
         AddrUtil/hash.o                    \
         CmdParse/CmdParse.o                \
         CryptoUtil/checksum.o              \
-        CryptoUtil/hash.o                  \
         CryptoUtil/ripemd160.o             \
         CryptoUtil/Rng.o                   \
         CryptoUtil/sha256.o                \

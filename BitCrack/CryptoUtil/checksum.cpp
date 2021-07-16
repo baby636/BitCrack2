@@ -2,7 +2,7 @@
 #include "CryptoUtil.h"
 #include <stdio.h>
 #include <string.h>
-/*
+
 static unsigned int endian(unsigned int x)
 {
 	return (x << 24) | ((x << 8) & 0x00ff0000) | ((x >> 8) & 0x0000ff00) | (x >> 24);
@@ -44,5 +44,5 @@ unsigned int crypto::checksum(const unsigned int* hash)
 
 	return digest[0];
 }
-*/
+
 
