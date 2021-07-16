@@ -1,3 +1,4 @@
+/*
 #include "CryptoUtil.h"
 #include <stdio.h>
 #include <string.h>
@@ -43,5 +44,5 @@ unsigned int crypto::checksum(const unsigned int* hash)
 
 	return digest[0];
 }
-
+*/
 
