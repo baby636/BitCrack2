@@ -16,8 +16,10 @@ private:
 	KeySearchDevice* _device;
 
 	unsigned int _compression;
+	unsigned int _searchMode;
 
-	std::set<KeySearchTarget> _targets;
+	std::set<KeySearchTargetHash160> _targetsHash160;
+	std::set<KeySearchTargetXPoint> _targetsXPoint;
 
 	uint64_t _statusInterval;
 
@@ -45,17 +47,20 @@ private:
 	static void defaultResultCallback(KeySearchResult result);
 	static void defaultStatusCallback(KeySearchStatus status);
 
-	void removeTargetFromList(const unsigned int value[5]);
-	bool isTargetInList(const unsigned int value[5]);
-	void setTargetsOnDevice();
+	void removeTargetFromListHash160(const unsigned int value[5]);
+	void removeTargetFromListXPoint(const unsigned int value[8]);
+	bool isTargetInListHash160(const unsigned int value[5]);
+	bool isTargetInListXPoint(const unsigned int value[8]);
+	//void setTargetsOnDevice();
 
 
 	void reSetupEverything();
 
 public:
 
-	KeyFinder(const secp256k1::uint256& startKey, const secp256k1::uint256& endKey, int compression,
-		KeySearchDevice* device, const secp256k1::uint256& stride, bool randomStride, bool continueAfterEnd, uint32_t randomSrtrideBits);
+	KeyFinder(const secp256k1::uint256& startKey, const secp256k1::uint256& endKey, int compression, int searchMode,
+		KeySearchDevice* device, const secp256k1::uint256& stride, bool randomStride, bool continueAfterEnd, 
+		uint32_t randomSrtrideBits);
 
 	~KeyFinder();
 

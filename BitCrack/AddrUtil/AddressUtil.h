@@ -8,6 +8,10 @@ namespace Address {
 	bool verifyAddress(std::string address);
 };
 
+namespace XPoint {
+	bool verifyXPoint(std::string xpoint);
+};
+
 namespace Base58 {
 	std::string toBase58(const secp256k1::uint256& x);
 	secp256k1::uint256 toBigInt(const std::string& s);

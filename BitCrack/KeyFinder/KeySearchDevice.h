@@ -30,6 +30,7 @@ typedef struct {
 	secp256k1::ecpoint publicKey;
 	secp256k1::uint256 privateKey;
 	unsigned int hash[5];
+	unsigned int x[8];
 	bool compressed;
 }KeySearchResult;
 
@@ -39,13 +40,16 @@ class KeySearchDevice {
 public:
 
 	// Initialize the device
-	virtual void init(const secp256k1::uint256& start, int compression, const secp256k1::uint256& stride) = 0;
+	virtual void init(const secp256k1::uint256& start, int compression, int searchMode, const secp256k1::uint256& stride) = 0;
 
 	// Perform one iteration
 	virtual void doStep() = 0;
 
 	// Tell the device which addresses to search for
-	virtual void setTargets(const std::set<KeySearchTarget>& targets) = 0;
+	virtual void setTargets(const std::set<KeySearchTargetHash160>& targets) = 0;
+
+	// Tell the device which xpoints to search for
+	virtual void setTargets(const std::set<KeySearchTargetXPoint>& targets) = 0;
 
 	// Get the private keys that have been found so far
 	virtual size_t getResults(std::vector<KeySearchResult>& results) = 0;

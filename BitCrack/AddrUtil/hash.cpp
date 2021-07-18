@@ -65,6 +65,22 @@ std::string Address::fromPublicKey(const secp256k1::ecpoint& p, bool compressed)
 	return "1" + Base58::toBase58(addressBigInt);
 }
 
+bool XPoint::verifyXPoint(std::string xpoint)
+{
+	bool flag = true;
+	auto length = xpoint.length();
+	for (int i = 0; i < length; i++) {
+		if (!isxdigit(xpoint[i])) {
+			flag = false;
+			break;
+		}
+	}
+	if (!flag)
+		return flag;
+
+	return (length == 64) && flag;
+}
+
 void Hash::hashPublicKey(const secp256k1::ecpoint& p, unsigned int* digest)
 {
 	unsigned int xWords[8];

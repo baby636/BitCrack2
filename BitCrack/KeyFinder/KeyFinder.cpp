@@ -18,14 +18,18 @@ void KeyFinder::defaultStatusCallback(KeySearchStatus status)
 	// Do nothing
 }
 
-KeyFinder::KeyFinder(const secp256k1::uint256& startKey, const secp256k1::uint256& endKey, int compression,
-	KeySearchDevice* device, const secp256k1::uint256& stride, bool randomStride, bool continueAfterEnd, uint32_t randomSrtrideBits)
+KeyFinder::KeyFinder(const secp256k1::uint256& startKey, const secp256k1::uint256& endKey, int compression, int searchMode,
+	KeySearchDevice* device, const secp256k1::uint256& stride, bool randomStride, bool continueAfterEnd,
+	uint32_t randomSrtrideBits)
 {
+	_totalTime = 0;
+	_running = false;
 	_total = 0;
 	_statusInterval = 1000;
 	_device = device;
 
 	_compression = compression;
+	_searchMode = searchMode;
 
 	_startKey = startKey;
 
@@ -60,23 +64,53 @@ void KeyFinder::setTargets(std::vector<std::string>& targets)
 		throw KeySearchException("Requires at least 1 target");
 	}
 
-	_targets.clear();
+	_targetsHash160.clear();
+	_targetsXPoint.clear();
 
-	// Convert each address from base58 encoded form to a 160-bit integer
-	for (unsigned int i = 0; i < targets.size(); i++) {
+	if (_searchMode == SearchMode::ADDRESS) {
 
-		if (!Address::verifyAddress(targets[i])) {
-			throw KeySearchException("Invalid address '" + targets[i] + "'");
+		// Convert each address from base58 encoded form to a 160-bit integer
+		for (unsigned int i = 0; i < targets.size(); i++) {
+
+			if (!Address::verifyAddress(targets[i])) {
+				throw KeySearchException("Invalid address '" + targets[i] + "'");
+			}
+
+			KeySearchTargetHash160 t;
+
+			Base58::toHash160(targets[i], t.value);
+
+			_targetsHash160.insert(t);
 		}
 
-		KeySearchTarget t;
+		_device->setTargets(_targetsHash160);
 
-		Base58::toHash160(targets[i], t.value);
-
-		_targets.insert(t);
 	}
+	else if (_searchMode == SearchMode::XPOINT) {
 
-	_device->setTargets(_targets);
+		// pubkey x points
+		for (unsigned int i = 0; i < targets.size(); i++) {
+
+			KeySearchTargetXPoint t;
+
+			secp256k1::uint256 value(targets[i]);
+			unsigned int words[8];
+
+			value.exportWords(words, 8, secp256k1::uint256::BigEndian);
+
+			for (int i = 0; i < 8; i++) {
+				t.value[i] = words[i];
+			}
+
+			_targetsXPoint.insert(t);
+		}
+
+		_device->setTargets(_targetsXPoint);
+
+	}
+	else {
+		throw KeySearchException("Invalid SearchMode");
+	}
 }
 
 void KeyFinder::setTargets(std::string targetsFile)
@@ -88,31 +122,69 @@ void KeyFinder::setTargets(std::string targetsFile)
 		throw KeySearchException();
 	}
 
-	_targets.clear();
+	_targetsHash160.clear();
+	_targetsXPoint.clear();
 
-	std::string line;
-	Logger::log(LogLevel::Info, "Loading addresses from '" + targetsFile + "'");
-	while (std::getline(inFile, line)) {
-		util::removeNewline(line);
-		line = util::trim(line);
+	if (_searchMode == SearchMode::ADDRESS) {
+		std::string line;
+		Logger::log(LogLevel::Info, "Loading addresses from '" + targetsFile + "'");
+		while (std::getline(inFile, line)) {
+			util::removeNewline(line);
+			line = util::trim(line);
 
-		if (line.length() > 0) {
-			if (!Address::verifyAddress(line)) {
-				Logger::log(LogLevel::Error, "Invalid address '" + line + "'");
-				throw KeySearchException();
+			if (line.length() > 0) {
+				if (!Address::verifyAddress(line)) {
+					Logger::log(LogLevel::Error, "Invalid address '" + line + "'");
+					throw KeySearchException();
+				}
+
+				KeySearchTargetHash160 t;
+
+				Base58::toHash160(line, t.value);
+
+				_targetsHash160.insert(t);
 			}
-
-			KeySearchTarget t;
-
-			Base58::toHash160(line, t.value);
-
-			_targets.insert(t);
 		}
-	}
-	Logger::log(LogLevel::Info, util::formatThousands(_targets.size()) + " addresses loaded ("
-		+ util::format("%.1f", (double)(sizeof(KeySearchTarget) * _targets.size()) / (double)(1024 * 1024)) + "MB)");
+		Logger::log(LogLevel::Info, util::formatThousands(_targetsHash160.size()) + " addresses loaded ("
+			+ util::format("%.1f", (double)(sizeof(KeySearchTargetHash160) * _targetsHash160.size()) / (double)(1024 * 1024)) + "MB)");
 
-	_device->setTargets(_targets);
+		_device->setTargets(_targetsHash160);
+
+	}
+	else if (_searchMode == SearchMode::XPOINT) {
+
+		std::string line;
+		Logger::log(LogLevel::Info, "Loading xpoints from '" + targetsFile + "'");
+		while (std::getline(inFile, line)) {
+			util::removeNewline(line);
+			line = util::trim(line);
+
+			if (line.length() > 0) {
+
+				KeySearchTargetXPoint t;
+
+				secp256k1::uint256 value(line);
+				unsigned int words[8];
+
+				value.exportWords(words, 8, secp256k1::uint256::BigEndian);
+
+				for (int i = 0; i < 8; i++) {
+					t.value[i] = words[i];
+				}
+
+				_targetsXPoint.insert(t);
+			}
+		}
+		Logger::log(LogLevel::Info, util::formatThousands(_targetsXPoint.size()) + " xpoints loaded ("
+			+ util::format("%.1f", (double)(sizeof(KeySearchTargetXPoint) * _targetsXPoint.size()) / (double)(1024 * 1024)) + "MB)");
+
+		_device->setTargets(_targetsXPoint);
+
+
+	}
+	else {
+		throw KeySearchException("Invalid SearchMode");
+	}
 }
 
 
@@ -131,23 +203,23 @@ void KeyFinder::setStatusInterval(uint64_t interval)
 	_statusInterval = interval;
 }
 
-void KeyFinder::setTargetsOnDevice()
-{
-	// Set the target in constant memory
-	std::vector<struct hash160> targets;
-
-	for (std::set<KeySearchTarget>::iterator i = _targets.begin(); i != _targets.end(); ++i) {
-		targets.push_back(hash160((*i).value));
-	}
-
-	_device->setTargets(_targets);
-}
+//void KeyFinder::setTargetsOnDevice()
+//{
+//	// Set the target in constant memory
+//	std::vector<struct hash160> targets;
+//
+//	for (std::set<KeySearchTarget>::iterator i = _targets.begin(); i != _targets.end(); ++i) {
+//		targets.push_back(hash160((*i).value));
+//	}
+//
+//	_device->setTargets(_targets);
+//}
 
 void KeyFinder::init()
 {
 	Logger::log(LogLevel::Info, "Initializing " + _device->getDeviceName());
 
-	_device->init(_startKey, _compression, _stride);
+	_device->init(_startKey, _compression, _searchMode, _stride);
 }
 
 
@@ -156,18 +228,32 @@ void KeyFinder::stop()
 	_running = false;
 }
 
-void KeyFinder::removeTargetFromList(const unsigned int hash[5])
+void KeyFinder::removeTargetFromListHash160(const unsigned int hash[5])
 {
-	KeySearchTarget t(hash);
+	KeySearchTargetHash160 t(hash);
 
-	_targets.erase(t);
+	_targetsHash160.erase(t);
 }
 
-bool KeyFinder::isTargetInList(const unsigned int hash[5])
+void KeyFinder::removeTargetFromListXPoint(const unsigned int point[8])
 {
-	KeySearchTarget t(hash);
-	return _targets.find(t) != _targets.end();
+	KeySearchTargetXPoint t(point);
+
+	_targetsXPoint.erase(t);
 }
+
+bool KeyFinder::isTargetInListHash160(const unsigned int hash[5])
+{
+	KeySearchTargetHash160 t(hash);
+	return _targetsHash160.find(t) != _targetsHash160.end();
+}
+
+bool KeyFinder::isTargetInListXPoint(const unsigned int point[8])
+{
+	KeySearchTargetXPoint t(point);
+	return _targetsXPoint.find(t) != _targetsXPoint.end();
+}
+
 
 
 void KeyFinder::run()
@@ -217,7 +303,7 @@ void KeyFinder::run()
 			info.freeMemory = freeMem;
 			info.deviceMemory = totalMem;
 			info.deviceName = _device->getDeviceName();
-			info.targets = _targets.size();
+			info.targets = _searchMode == SearchMode::ADDRESS ? _targetsHash160.size() : _targetsXPoint.size();
 			info.nextKey = getNextKey();
 			info.stride = _stride;
 			info.rStrideCount = _rStrideCount;
@@ -244,14 +330,22 @@ void KeyFinder::run()
 				_resultCallback(info);
 			}
 
-			// Remove the hashes that were found
-			for (unsigned int i = 0; i < results.size(); i++) {
-				removeTargetFromList(results[i].hash);
+			if (_searchMode == SearchMode::ADDRESS) {
+				// Remove the hashes that were found
+				for (unsigned int i = 0; i < results.size(); i++) {
+					removeTargetFromListHash160(results[i].hash);
+				}
+			}
+			else if (_searchMode == SearchMode::XPOINT) {
+				// Remove the xpoints that were found
+				for (unsigned int i = 0; i < results.size(); i++) {
+					removeTargetFromListXPoint(results[i].x);
+				}
 			}
 		}
 
 		// Stop if there are no keys left
-		if (_targets.size() == 0) {
+		if ((_searchMode == SearchMode::ADDRESS) ? (_targetsHash160.size() == 0) : (_targetsXPoint.size() == 0)) {
 			printf("\n");
 			Logger::log(LogLevel::Info, "No targets remaining");
 			_running = false;

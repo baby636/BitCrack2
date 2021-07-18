@@ -1,16 +1,16 @@
 #include "cudabridge.h"
 
 
-__global__ void keyFinderKernel(int points, int compression);
-__global__ void keyFinderKernelWithDouble(int points, int compression);
+__global__ void keyFinderKernel(int points, int compression, int searchMode);
+__global__ void keyFinderKernelWithDouble(int points, int compression, int searchMode);
 
-void callKeyFinderKernel(int blocks, int threads, int points, bool useDouble, int compression)
+void callKeyFinderKernel(int blocks, int threads, int points, bool useDouble, int compression, int searchMode)
 {
 	if (useDouble) {
-		keyFinderKernelWithDouble << <blocks, threads >> > (points, compression);
+		keyFinderKernelWithDouble << <blocks, threads >> > (points, compression, searchMode);
 	}
 	else {
-		keyFinderKernel << <blocks, threads >> > (points, compression);
+		keyFinderKernel << <blocks, threads >> > (points, compression, searchMode);
 	}
 	waitForKernel();
 }

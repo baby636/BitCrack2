@@ -1,4 +1,3 @@
-
 #include "CryptoUtil.h"
 #include <stdio.h>
 #include <string.h>

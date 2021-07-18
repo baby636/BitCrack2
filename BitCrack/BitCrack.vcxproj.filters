@@ -96,9 +96,6 @@
     <ClInclude Include="KeyFinder\KeySearchDevice.h">
       <Filter>KeyFinder</Filter>
     </ClInclude>
-    <ClInclude Include="KeyFinder\KeySearchTypes.h">
-      <Filter>KeyFinder</Filter>
-    </ClInclude>
     <ClInclude Include="Logger\Logger.h">
       <Filter>Logger</Filter>
     </ClInclude>
@@ -107,6 +104,9 @@
     </ClInclude>
     <ClInclude Include="Secp256k1\secp256k1.h">
       <Filter>Secp256k1</Filter>
+    </ClInclude>
+    <ClInclude Include="KeyFinder\KeySearchTypes.h">
+      <Filter>KeyFinder</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -120,6 +120,9 @@
       <Filter>CmdParse</Filter>
     </ClCompile>
     <ClCompile Include="CryptoUtil\checksum.cpp">
+      <Filter>CryptoUtil</Filter>
+    </ClCompile>
+    <ClCompile Include="CryptoUtil\hash.cpp">
       <Filter>CryptoUtil</Filter>
     </ClCompile>
     <ClCompile Include="CryptoUtil\ripemd160.cpp">

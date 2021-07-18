@@ -35,6 +35,8 @@ private:
 
 	int _compression;
 
+	int _searchMode;
+
 	std::vector<KeySearchResult> _results;
 
 	std::string _deviceName;
@@ -56,28 +58,34 @@ private:
 
 	void getResultsInternal();
 
-	std::vector<hash160> _targets;
+	std::vector<hash160> _targetsHash160;
 
-	bool isTargetInList(const unsigned int hash[5]);
+	std::vector<xpoint> _targetsXPoint;
 
-	void removeTargetFromList(const unsigned int hash[5]);
+	bool isTargetInListHash160(const unsigned int hash[5]);
+	bool isTargetInListXPoint(const unsigned int point[8]);
+
+	void removeTargetFromListHash160(const unsigned int hash[5]);
+	void removeTargetFromListXPoint(const unsigned int point[8]);
 
 	uint32_t getPrivateKeyOffset(int thread, int block, int point);
 
 	secp256k1::uint256 _stride;
 
-	bool verifyKey(const secp256k1::uint256& privateKey, const secp256k1::ecpoint& publicKey, const unsigned int hash[5], bool compressed);
+	//bool verifyKeyHash160(const secp256k1::uint256& privateKey, const secp256k1::ecpoint& publicKey, const unsigned int hash[5], bool compressed);
 
 public:
 
 	CudaKeySearchDevice(int device, int threads, int pointsPerThread, int blocks = 0);
 	~CudaKeySearchDevice();
 
-	virtual void init(const secp256k1::uint256& start, int compression, const secp256k1::uint256& stride);
+	virtual void init(const secp256k1::uint256& start, int compression, int searchMode, const secp256k1::uint256& stride);
 
 	virtual void doStep();
 
-	virtual void setTargets(const std::set<KeySearchTarget>& targets);
+	virtual void setTargets(const std::set<KeySearchTargetHash160>& targets);
+
+	virtual void setTargets(const std::set<KeySearchTargetXPoint>& targets);
 
 	virtual size_t getResults(std::vector<KeySearchResult>& results);
 

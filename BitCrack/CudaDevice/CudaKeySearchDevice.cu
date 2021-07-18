@@ -137,7 +137,7 @@ __device__ void setResultFound(int idx, bool compressed, unsigned int x[8], unsi
 	atomicListAdd(&r, sizeof(r));
 }
 
-__device__ void doIteration(int pointsPerThread, int compression)
+__device__ void doIteration(int pointsPerThread, int compression, int searchMode)
 {
 	unsigned int* chain = _CHAIN[0];
 	unsigned int* xPtr = ec::getXPtr();
@@ -152,23 +152,34 @@ __device__ void doIteration(int pointsPerThread, int compression)
 
 		readInt(xPtr, i, x);
 
-		if (compression == PointCompressionType::UNCOMPRESSED || compression == PointCompressionType::BOTH) {
-			unsigned int y[8];
-			readInt(yPtr, i, y);
+		if (searchMode == SearchMode::ADDRESS) {
 
-			hashPublicKey(x, y, digest);
-
-			if (checkHash(digest)) {
-				setResultFound(i, false, x, y, digest);
-			}
-		}
-
-		if (compression == PointCompressionType::COMPRESSED || compression == PointCompressionType::BOTH) {
-			hashPublicKeyCompressed(x, readIntLSW(yPtr, i), digest);
-
-			if (checkHash(digest)) {
+			if (compression == PointCompressionType::UNCOMPRESSED || compression == PointCompressionType::BOTH) {
 				unsigned int y[8];
 				readInt(yPtr, i, y);
+
+				hashPublicKey(x, y, digest);
+
+				if (checkHash(digest)) {
+					setResultFound(i, false, x, y, digest);
+				}
+			}
+
+			if (compression == PointCompressionType::COMPRESSED || compression == PointCompressionType::BOTH) {
+				hashPublicKeyCompressed(x, readIntLSW(yPtr, i), digest);
+
+				if (checkHash(digest)) {
+					unsigned int y[8];
+					readInt(yPtr, i, y);
+					setResultFound(i, true, x, y, digest);
+				}
+			}
+		}
+		else {
+			if (checkXPoint(x)) {
+				unsigned int y[8];
+				readInt(yPtr, i, y);
+				hashPublicKeyCompressed(x, readIntLSW(yPtr, i), digest);
 				setResultFound(i, true, x, y, digest);
 			}
 		}
@@ -188,9 +199,10 @@ __device__ void doIteration(int pointsPerThread, int compression)
 		writeInt(xPtr, i, newX);
 		writeInt(yPtr, i, newY);
 	}
+	__syncthreads();
 }
 
-__device__ void doIterationWithDouble(int pointsPerThread, int compression)
+__device__ void doIterationWithDouble(int pointsPerThread, int compression, int searchMode)
 {
 	unsigned int* chain = _CHAIN[0];
 	unsigned int* xPtr = ec::getXPtr();
@@ -205,27 +217,38 @@ __device__ void doIterationWithDouble(int pointsPerThread, int compression)
 
 		readInt(xPtr, i, x);
 
-		// uncompressed
-		if (compression == PointCompressionType::UNCOMPRESSED || compression == PointCompressionType::BOTH) {
-			unsigned int y[8];
-			readInt(yPtr, i, y);
-			hashPublicKey(x, y, digest);
+		if (searchMode == SearchMode::ADDRESS) {
 
-			if (checkHash(digest)) {
-				setResultFound(i, false, x, y, digest);
-			}
-		}
-
-		// compressed
-		if (compression == PointCompressionType::COMPRESSED || compression == PointCompressionType::BOTH) {
-
-			hashPublicKeyCompressed(x, readIntLSW(yPtr, i), digest);
-
-			if (checkHash(digest)) {
-
+			// uncompressed
+			if (compression == PointCompressionType::UNCOMPRESSED || compression == PointCompressionType::BOTH) {
 				unsigned int y[8];
 				readInt(yPtr, i, y);
+				hashPublicKey(x, y, digest);
 
+				if (checkHash(digest)) {
+					setResultFound(i, false, x, y, digest);
+				}
+			}
+
+			// compressed
+			if (compression == PointCompressionType::COMPRESSED || compression == PointCompressionType::BOTH) {
+
+				hashPublicKeyCompressed(x, readIntLSW(yPtr, i), digest);
+
+				if (checkHash(digest)) {
+
+					unsigned int y[8];
+					readInt(yPtr, i, y);
+
+					setResultFound(i, true, x, y, digest);
+				}
+			}
+		}
+		else {
+			if (checkXPoint(x)) {
+				unsigned int y[8];
+				readInt(yPtr, i, y);
+				hashPublicKeyCompressed(x, readIntLSW(yPtr, i), digest);
 				setResultFound(i, true, x, y, digest);
 			}
 		}
@@ -245,17 +268,18 @@ __device__ void doIterationWithDouble(int pointsPerThread, int compression)
 		writeInt(xPtr, i, newX);
 		writeInt(yPtr, i, newY);
 	}
+	__syncthreads();
 }
 
 /**
 * Performs a single iteration
 */
-__global__ void keyFinderKernel(int points, int compression)
+__global__ void keyFinderKernel(int points, int compression, int searchMode)
 {
-	doIteration(points, compression);
+	doIteration(points, compression, searchMode);
 }
 
-__global__ void keyFinderKernelWithDouble(int points, int compression)
+__global__ void keyFinderKernelWithDouble(int points, int compression, int searchMode)
 {
-	doIterationWithDouble(points, compression);
+	doIterationWithDouble(points, compression, searchMode);
 }

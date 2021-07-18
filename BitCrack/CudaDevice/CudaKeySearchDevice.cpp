@@ -60,7 +60,7 @@ CudaKeySearchDevice::CudaKeySearchDevice(int device, int threads, int pointsPerT
 	_pointsPerThread = pointsPerThread;
 }
 
-void CudaKeySearchDevice::init(const secp256k1::uint256& start, int compression, const secp256k1::uint256& stride)
+void CudaKeySearchDevice::init(const secp256k1::uint256& start, int compression, int searchMode, const secp256k1::uint256& stride)
 {
 	if (start.cmp(secp256k1::N) >= 0) {
 		throw KeySearchException("Starting key is out of range");
@@ -69,6 +69,8 @@ void CudaKeySearchDevice::init(const secp256k1::uint256& start, int compression,
 	_startExponent = start;
 
 	_compression = compression;
+
+	_searchMode = searchMode;
 
 	_stride = stride;
 
@@ -178,17 +180,30 @@ void CudaKeySearchDevice::reGenerateStartingPoints()
 	//_deviceKeys.clearPrivateKeys();
 }
 
-void CudaKeySearchDevice::setTargets(const std::set<KeySearchTarget>& targets)
+void CudaKeySearchDevice::setTargets(const std::set<KeySearchTargetHash160>& targets)
 {
-	_targets.clear();
+	_targetsHash160.clear();
 
-	for (std::set<KeySearchTarget>::iterator i = targets.begin(); i != targets.end(); ++i) {
+	for (std::set<KeySearchTargetHash160>::iterator i = targets.begin(); i != targets.end(); ++i) {
 		hash160 h(i->value);
-		_targets.push_back(h);
+		_targetsHash160.push_back(h);
 	}
 
-	cudaCall(_targetLookup.setTargets(_targets));
+	cudaCall(_targetLookup.setTargets(_targetsHash160));
 }
+
+void CudaKeySearchDevice::setTargets(const std::set<KeySearchTargetXPoint>& targets)
+{
+	_targetsXPoint.clear();
+
+	for (std::set<KeySearchTargetXPoint>::iterator i = targets.begin(); i != targets.end(); ++i) {
+		xpoint h(i->value);
+		_targetsXPoint.push_back(h);
+	}
+
+	cudaCall(_targetLookup.setTargets(_targetsXPoint));
+}
+
 
 void CudaKeySearchDevice::doStep()
 {
@@ -196,10 +211,10 @@ void CudaKeySearchDevice::doStep()
 
 	try {
 		if (_iterations < 2 && _startExponent.cmp(numKeys) <= 0) {
-			callKeyFinderKernel(_blocks, _threads, _pointsPerThread, true, _compression);
+			callKeyFinderKernel(_blocks, _threads, _pointsPerThread, true, _compression, _searchMode);
 		}
 		else {
-			callKeyFinderKernel(_blocks, _threads, _pointsPerThread, false, _compression);
+			callKeyFinderKernel(_blocks, _threads, _pointsPerThread, false, _compression, _searchMode);
 		}
 	}
 	catch (cuda::CudaException ex) {
@@ -226,25 +241,52 @@ void CudaKeySearchDevice::getMemoryInfo(uint64_t& freeMem, uint64_t& totalMem)
 	cudaCall(cudaMemGetInfo(&freeMem, &totalMem));
 }
 
-void CudaKeySearchDevice::removeTargetFromList(const unsigned int hash[5])
+void CudaKeySearchDevice::removeTargetFromListHash160(const unsigned int hash[5])
 {
-	size_t count = _targets.size();
+	size_t count = _targetsHash160.size();
 
 	while (count) {
-		if (memcmp(hash, _targets[count - 1].h, 20) == 0) {
-			_targets.erase(_targets.begin() + count - 1);
+		if (memcmp(hash, _targetsHash160[count - 1].h, 20) == 0) {
+			_targetsHash160.erase(_targetsHash160.begin() + count - 1);
 			return;
 		}
 		count--;
 	}
 }
 
-bool CudaKeySearchDevice::isTargetInList(const unsigned int hash[5])
+void CudaKeySearchDevice::removeTargetFromListXPoint(const unsigned int point[8])
 {
-	size_t count = _targets.size();
+	size_t count = _targetsXPoint.size();
 
 	while (count) {
-		if (memcmp(hash, _targets[count - 1].h, 20) == 0) {
+		if (memcmp(point, _targetsXPoint[count - 1].p, 32) == 0) {
+			_targetsXPoint.erase(_targetsXPoint.begin() + count - 1);
+			return;
+		}
+		count--;
+	}
+}
+
+bool CudaKeySearchDevice::isTargetInListHash160(const unsigned int hash[5])
+{
+	size_t count = _targetsHash160.size();
+
+	while (count) {
+		if (memcmp(hash, _targetsHash160[count - 1].h, 20) == 0) {
+			return true;
+		}
+		count--;
+	}
+
+	return false;
+}
+
+bool CudaKeySearchDevice::isTargetInListXPoint(const unsigned int point[8])
+{
+	size_t count = _targetsXPoint.size();
+
+	while (count) {
+		if (memcmp(point, _targetsXPoint[count - 1].p, 32) == 0) {
 			return true;
 		}
 		count--;
@@ -278,45 +320,84 @@ void CudaKeySearchDevice::getResultsInternal()
 
 	_resultList.read(ptr, count);
 
-	for (int i = 0; i < count; i++) {
-		struct CudaDeviceResult* rPtr = &((struct CudaDeviceResult*)ptr)[i];
+	if (_searchMode == SearchMode::ADDRESS) {
 
-		// might be false-positive
-		if (!isTargetInList(rPtr->digest)) {
-			continue;
+		for (int i = 0; i < count; i++) {
+			struct CudaDeviceResult* rPtr = &((struct CudaDeviceResult*)ptr)[i];
+
+			// might be false-positive
+			if (!isTargetInListHash160(rPtr->digest)) {
+				continue;
+			}
+			actualCount++;
+
+			KeySearchResult minerResult;
+
+			// Calculate the private key based on the number of iterations and the current thread
+			secp256k1::uint256 offset = (secp256k1::uint256((uint64_t)_blocks * _threads * _pointsPerThread * _iterations) + secp256k1::uint256(getPrivateKeyOffset(rPtr->thread, rPtr->block, rPtr->idx))) * _stride;
+			secp256k1::uint256 privateKey = secp256k1::addModN(_startExponent, offset);
+
+			minerResult.privateKey = privateKey;
+			minerResult.compressed = rPtr->compressed;
+
+			memcpy(minerResult.hash, rPtr->digest, 20);
+
+			minerResult.publicKey = secp256k1::ecpoint(secp256k1::uint256(rPtr->x, secp256k1::uint256::BigEndian), secp256k1::uint256(rPtr->y, secp256k1::uint256::BigEndian));
+
+			removeTargetFromListHash160(rPtr->digest);
+
+			_results.push_back(minerResult);
 		}
-		actualCount++;
 
-		KeySearchResult minerResult;
+		// Reload the bloom filters
+		if (actualCount) {
+			cudaCall(_targetLookup.setTargets(_targetsHash160));
+		}
+	}
+	else if (_searchMode == SearchMode::XPOINT) {
 
-		// Calculate the private key based on the number of iterations and the current thread
-		secp256k1::uint256 offset = (secp256k1::uint256((uint64_t)_blocks * _threads * _pointsPerThread * _iterations) + secp256k1::uint256(getPrivateKeyOffset(rPtr->thread, rPtr->block, rPtr->idx))) * _stride;
-		secp256k1::uint256 privateKey = secp256k1::addModN(_startExponent, offset);
+		for (int i = 0; i < count; i++) {
+			struct CudaDeviceResult* rPtr = &((struct CudaDeviceResult*)ptr)[i];
 
-		minerResult.privateKey = privateKey;
-		minerResult.compressed = rPtr->compressed;
+			// might be false-positive
+			if (!isTargetInListXPoint(rPtr->x)) {
+				continue;
+			}
+			actualCount++;
 
-		memcpy(minerResult.hash, rPtr->digest, 20);
+			KeySearchResult minerResult;
 
-		minerResult.publicKey = secp256k1::ecpoint(secp256k1::uint256(rPtr->x, secp256k1::uint256::BigEndian), secp256k1::uint256(rPtr->y, secp256k1::uint256::BigEndian));
+			// Calculate the private key based on the number of iterations and the current thread
+			secp256k1::uint256 offset = (secp256k1::uint256((uint64_t)_blocks * _threads * _pointsPerThread * _iterations) + secp256k1::uint256(getPrivateKeyOffset(rPtr->thread, rPtr->block, rPtr->idx))) * _stride;
+			secp256k1::uint256 privateKey = secp256k1::addModN(_startExponent, offset);
 
-		removeTargetFromList(rPtr->digest);
+			minerResult.privateKey = privateKey;
+			minerResult.compressed = rPtr->compressed;
 
-		_results.push_back(minerResult);
+			memcpy(minerResult.x, rPtr->x, 32);
+
+			minerResult.publicKey = secp256k1::ecpoint(secp256k1::uint256(rPtr->x, secp256k1::uint256::BigEndian), secp256k1::uint256(rPtr->y, secp256k1::uint256::BigEndian));
+
+			removeTargetFromListXPoint(rPtr->x);
+
+			_results.push_back(minerResult);
+		}
+
+		// Reload the bloom filters
+		if (actualCount) {
+			cudaCall(_targetLookup.setTargets(_targetsXPoint));
+		}
 	}
 
 	delete[] ptr;
 
 	_resultList.clear();
 
-	// Reload the bloom filters
-	if (actualCount) {
-		cudaCall(_targetLookup.setTargets(_targets));
-	}
 }
 
+/*
 // Verify a private key produces the public key and hash
-bool CudaKeySearchDevice::verifyKey(const secp256k1::uint256& privateKey, const secp256k1::ecpoint& publicKey, const unsigned int hash[5], bool compressed)
+bool CudaKeySearchDevice::verifyKeyHash160(const secp256k1::uint256& privateKey, const secp256k1::ecpoint& publicKey, const unsigned int hash[5], bool compressed)
 {
 	secp256k1::ecpoint g = secp256k1::G();
 
@@ -348,6 +429,7 @@ bool CudaKeySearchDevice::verifyKey(const secp256k1::uint256& privateKey, const 
 
 	return true;
 }
+*/
 
 size_t CudaKeySearchDevice::getResults(std::vector<KeySearchResult>& resultsOut)
 {

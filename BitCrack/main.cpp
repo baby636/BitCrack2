@@ -17,7 +17,9 @@
 #include <gmp.h>
 #include <gmpxx.h>
 
-#define RELEASE "1.02"
+#define RELEASE "1.03"
+
+
 
 typedef struct _RunConfig {
 	// startKey is the first key. We store it so that if the --continue
@@ -39,6 +41,8 @@ typedef struct _RunConfig {
 	unsigned int pointsPerThread = 0;
 
 	int compression = PointCompressionType::COMPRESSED;
+	int searchMode = SearchMode::ADDRESS;
+
 
 	std::vector<std::string> targets;
 
@@ -220,31 +224,33 @@ void usage()
 	printf("BitCrack OPTIONS [TARGETS]\n");
 	printf("Where TARGETS is one or more addresses\n\n");
 
-	printf("--help                  Display this message\n");
-	printf("-c, --compressed        Use compressed points\n");
-	printf("-u, --uncompressed      Use Uncompressed points\n");
-	printf("--compression  MODE     Specify compression where MODE is\n");
-	printf("                          COMPRESSED or UNCOMPRESSED or BOTH\n");
-	printf("-d, --device ID         Use device ID\n");
-	printf("-b, --blocks N          N blocks\n");
-	printf("-t, --threads N         N threads per block\n");
-	printf("-p, --points N          N points per thread\n");
-	printf("-i, --in FILE           Read addresses from FILE, one per line\n");
-	printf("-o, --out FILE          Write keys to FILE\n");
-	printf("-f, --follow            Follow text output\n");
-	printf("--list-devices          List available devices\n");
-	printf("--keyspace KEYSPACE     Specify the keyspace:\n");
-	printf("                          START:END\n");
-	printf("                          START:+COUNT\n");
-	printf("                          START\n");
-	printf("                          :END\n");
-	printf("                          :+COUNT\n");
-	printf("                        Where START, END, COUNT are in hex format\n");
-	printf("--stride N              Increment by N keys at a time\n");
-	printf("--rstride N             Random stride bits, continue after end of range by setting up new random stride\n");
-	printf("--share M/N             Divide the keyspace into N equal shares, process the Mth share\n");
-	printf("--continue FILE         Save/load progress from FILE\n");
-	printf("-v, --version           Show version\n");
+	printf("--help                       Display this message\n");
+	printf("-c, --compressed             Use compressed points\n");
+	printf("-u, --uncompressed           Use Uncompressed points\n");
+	printf("--compression  MODE          Specify compression where MODE is\n");
+	printf("                                 COMPRESSED or UNCOMPRESSED or BOTH\n");
+	printf("-d, --device ID              Use device ID\n");
+	printf("-b, --blocks N               N blocks\n");
+	printf("-t, --threads N              N threads per block\n");
+	printf("-p, --points N               N points per thread\n");
+	printf("-i, --in FILE                Read addresses from FILE, one per line\n");
+	printf("-o, --out FILE               Write keys to FILE\n");
+	printf("-f, --follow                 Follow text output\n");
+	printf("-m, --mode MODE              Specify search mode where MODE is\n");
+	printf("                                 ADDRESS or XPOINT\n");
+	printf("--list-devices               List available devices\n");
+	printf("--keyspace KEYSPACE          Specify the keyspace:\n");
+	printf("                                 START:END\n");
+	printf("                                 START:+COUNT\n");
+	printf("                                 START\n");
+	printf("                                 :END\n");
+	printf("                                 :+COUNT\n");
+	printf("                             Where START, END, COUNT are in hex format\n");
+	printf("--stride N                   Increment by N keys at a time\n");
+	printf("--rstride N                  Random stride bits, continue after end of range by setting up new random stride\n");
+	printf("--share M/N                  Divide the keyspace into N equal shares, process the Mth share\n");
+	printf("--continue FILE              Save/load progress from FILE\n");
+	printf("-v, --version                Show version\n");
 }
 
 
@@ -315,6 +321,21 @@ int parseCompressionString(const std::string& s)
 	throw std::string("Invalid compression format: '" + s + "'");
 }
 
+int parseSearchModeString(const std::string& s)
+{
+	std::string stype = util::toLower(s);
+
+	if (stype == "address") {
+		return SearchMode::ADDRESS;
+	}
+
+	if (stype == "xpoint") {
+		return  SearchMode::XPOINT;
+	}
+
+	throw std::string("Invalid search mode format: '" + s + "'");
+}
+
 static std::string getCompressionString(int mode)
 {
 	switch (mode) {
@@ -329,6 +350,18 @@ static std::string getCompressionString(int mode)
 	throw std::string("Invalid compression setting '" + util::format(mode) + "'");
 }
 
+static std::string getSearchModeString(int mode)
+{
+	switch (mode) {
+	case SearchMode::ADDRESS:
+		return "ADDRESS";
+	case SearchMode::XPOINT:
+		return "XPOINT";
+	}
+
+	throw std::string("Invalid search mode setting '" + util::format(mode) + "'");
+}
+
 void writeCheckpoint(secp256k1::uint256 nextKey)
 {
 	std::ofstream tmp(_config.checkpointFile, std::ios::out);
@@ -340,6 +373,7 @@ void writeCheckpoint(secp256k1::uint256 nextKey)
 	tmp << "threads=" << _config.threads << std::endl;
 	tmp << "points=" << _config.pointsPerThread << std::endl;
 	tmp << "compression=" << getCompressionString(_config.compression) << std::endl;
+	tmp << "searchmode=" << getSearchModeString(_config.searchMode) << std::endl;
 	tmp << "device=" << _config.device << std::endl;
 	tmp << "elapsed=" << (_config.elapsed + util::getSystemTime() - _startTime) << std::endl;
 	tmp << "stride=" << _config.stride.toString();
@@ -378,6 +412,9 @@ void readCheckpointFile()
 	if (entries.find("compression") != entries.end()) {
 		_config.compression = parseCompressionString(entries["compression"].value);
 	}
+	if (entries.find("searchmode") != entries.end()) {
+		_config.searchMode = parseSearchModeString(entries["searchmode"].value);
+	}
 	if (entries.find("elapsed") != entries.end()) {
 		_config.elapsed = util::parseUInt32(entries["elapsed"].value);
 	}
@@ -399,6 +436,7 @@ int run()
 	_config.range = _config.range.sub(_config.nextKey);
 
 	Logger::log(LogLevel::Info, "Compression : " + getCompressionString(_config.compression));
+	Logger::log(LogLevel::Info, "Seach mode  : " + getSearchModeString(_config.searchMode));
 	Logger::log(LogLevel::Info, "Starting at : " + _config.nextKey.toString() + " (" + std::to_string(_config.nextKey.getBitRange()) + " bit)");
 	Logger::log(LogLevel::Info, "Ending at   : " + _config.endKey.toString() + " (" + std::to_string(_config.endKey.getBitRange()) + " bit)");
 	Logger::log(LogLevel::Info, "Range       : " + _config.range.toString() + " (" + std::to_string(_config.range.getBitRange()) + " bit)");
@@ -425,27 +463,27 @@ int run()
 		}
 
 		// Get device context
-		KeySearchDevice* d = getDeviceContext(_devices[_config.device], _config.blocks, _config.threads, _config.pointsPerThread);
+		KeySearchDevice* device = getDeviceContext(_devices[_config.device], _config.blocks, _config.threads, _config.pointsPerThread);
 
-		KeyFinder f(_config.nextKey, _config.endKey, _config.compression, d, _config.stride,
+		KeyFinder finder(_config.nextKey, _config.endKey, _config.compression, _config.searchMode, device, _config.stride,
 			_config.randomStride, _config.continueAfterEnd, _config.randomSrtrideBits);
 
-		f.setResultCallback(resultCallback);
-		f.setStatusInterval(_config.statusInterval);
-		f.setStatusCallback(statusCallback);
+		finder.setResultCallback(resultCallback);
+		finder.setStatusInterval(_config.statusInterval);
+		finder.setStatusCallback(statusCallback);
 
-		f.init();
+		finder.init();
 
 		if (!_config.targetsFile.empty()) {
-			f.setTargets(_config.targetsFile);
+			finder.setTargets(_config.targetsFile);
 		}
 		else {
-			f.setTargets(_config.targets);
+			finder.setTargets(_config.targets);
 		}
 
-		f.run();
+		finder.run();
 
-		delete d;
+		delete device;
 	}
 	catch (KeySearchException ex) {
 		Logger::log(LogLevel::Info, "Error: " + ex.msg);
@@ -544,6 +582,7 @@ int main(int argc, char** argv)
 	parser.add("-i", "--in", true);
 	parser.add("-o", "--out", true);
 	parser.add("-f", "--follow", false);
+	parser.add("-m", "--mode", true);
 	parser.add("", "--list-devices", false);
 	parser.add("", "--keyspace", true);
 	parser.add("", "--continue", true);
@@ -595,6 +634,9 @@ int main(int argc, char** argv)
 			}
 			else if (optArg.equals("", "--compression")) {
 				_config.compression = parseCompressionString(optArg.arg);
+			}
+			else if (optArg.equals("-m", "--mode")) {
+				_config.searchMode = parseSearchModeString(optArg.arg);
 			}
 			else if (optArg.equals("-i", "--in")) {
 				_config.targetsFile = optArg.arg;
@@ -693,21 +735,42 @@ int main(int argc, char** argv)
 	std::vector<std::string> ops = parser.getOperands();
 
 	// If there are no operands, then we must be reading from a file, otherwise
-	// expect addresses on the commandline
-	if (ops.size() == 0) {
-		if (_config.targetsFile.length() == 0) {
-			Logger::log(LogLevel::Error, "Missing arguments");
-			usage();
-			return 1;
+	if (_config.searchMode == SearchMode::ADDRESS) {
+		// expect addresses on the commandline
+		if (ops.size() == 0) {
+			if (_config.targetsFile.length() == 0) {
+				Logger::log(LogLevel::Error, "Missing arguments");
+				usage();
+				return 1;
+			}
+		}
+		else {
+			for (unsigned int i = 0; i < ops.size(); i++) {
+				if (!Address::verifyAddress(ops[i])) {
+					Logger::log(LogLevel::Error, "Invalid address '" + ops[i] + "'");
+					return 1;
+				}
+				_config.targets.push_back(ops[i]);
+			}
 		}
 	}
 	else {
-		for (unsigned int i = 0; i < ops.size(); i++) {
-			if (!Address::verifyAddress(ops[i])) {
-				Logger::log(LogLevel::Error, "Invalid address '" + ops[i] + "'");
+		// expect xpoints on the commandline
+		if (ops.size() == 0) {
+			if (_config.targetsFile.length() == 0) {
+				Logger::log(LogLevel::Error, "Missing arguments");
+				usage();
 				return 1;
 			}
-			_config.targets.push_back(ops[i]);
+		}
+		else {
+			for (unsigned int i = 0; i < ops.size(); i++) {
+				if (!XPoint::verifyXPoint(ops[i])) {
+					Logger::log(LogLevel::Error, "Invalid xpoint '" + ops[i] + "'");
+					return 1;
+				}
+				_config.targets.push_back(ops[i]);
+			}
 		}
 	}
 
@@ -745,6 +808,11 @@ int main(int argc, char** argv)
 
 	if (_config.checkpointFile.length() > 0) {
 		readCheckpointFile();
+	}
+
+	if (_config.searchMode == SearchMode::XPOINT && _config.compression != PointCompressionType::COMPRESSED) {
+		Logger::log(LogLevel::Error, "'XPOINT' search mode not valid with compression '" + getCompressionString(_config.compression) + "'");
+		return 1;
 	}
 
 	return run();

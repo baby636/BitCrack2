@@ -42,6 +42,7 @@
     <ClCompile Include="AddrUtil\hash.cpp" />
     <ClCompile Include="CmdParse\CmdParse.cpp" />
     <ClCompile Include="CryptoUtil\checksum.cpp" />
+    <ClCompile Include="CryptoUtil\hash.cpp" />
     <ClCompile Include="CryptoUtil\ripemd160.cpp" />
     <ClCompile Include="CryptoUtil\Rng.cpp" />
     <ClCompile Include="CryptoUtil\sha256.cpp" />
