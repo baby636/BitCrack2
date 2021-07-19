@@ -30,7 +30,7 @@ Where TARGETS is one or more addresses
 --help                       Display this message
 -c, --compressed             Use compressed points
 -u, --uncompressed           Use Uncompressed points
---compression MODE          Specify compression where MODE is
+--compression  MODE          Specify compression where MODE is
                                  COMPRESSED or UNCOMPRESSED or BOTH
 -d, --device ID              Use device ID
 -b, --blocks N               N blocks
@@ -50,7 +50,7 @@ Where TARGETS is one or more addresses
                                  :+COUNT
                              Where START, END, COUNT are in hex format
 --stride N                   Increment by N keys at a time
---rstride N                  Random stride bits, continue after end of range by setting up new random stride
+--rstride N                  Random stride bits[1 to 128], continue after end of range by setting up new random stride
 --share M/N                  Divide the keyspace into N equal shares, process the Mth share
 --continue FILE              Save/load progress from FILE
 -v, --version                Show version
