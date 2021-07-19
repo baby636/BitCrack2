@@ -10,7 +10,7 @@ Thank you him for his hardwork.
 # Changes 
 
 - Added random stride option, by using this option, the program run indefinitely after the end of keyspace, it starts again from starting range with the updated random stride of given bit length, it continues doing this until it found keys or you stoped it. This is like a random walk with random distance.
-- For --rstride N, N should be ```64 >= N >= 1```, here N is the bit length of the incrementor.
+- For --rstride N, N should be ```128 >= N >= 1```, here N is the bit length of the incrementor.
 - Added support for XPoint search mode.
 - Saving-Loading checkpoints are not modified for new changes.
 - OpenCL support removed.
@@ -130,6 +130,23 @@ BitCrack.exe -b 64 -t 256 -p 1024 --rstride 5 -m xpoint --keyspace 400000000:1ff
 
 [2021-07-18.17:35:50] [Info] No targets remaining
 ```
+
+## Attempting puzzle ```160``` with ```--rstride``` of ```124``` bit in xpoint search mode
+```
+BitCrack.exe -b 64 -t 256 -p 1024 --rstride 124 --mode xpoint --keyspace 8000000000000000000000000000000000000000:ffffffffffffffffffffffffffffffffffffffff e0a8b039282faf6fe0fd769cfbc4b6b4cf8758ba68220eac420e32b91ddfa673
+[2021-07-20.00:33:10] [Info] Compression : compressed
+[2021-07-20.00:33:10] [Info] Seach mode  : XPOINT
+[2021-07-20.00:33:10] [Info] Starting at : 8000000000000000000000000000000000000000 (160 bit)
+[2021-07-20.00:33:10] [Info] Ending at   : FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF (160 bit)
+[2021-07-20.00:33:10] [Info] Range       : 7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF (159 bit)
+[2021-07-20.00:33:10] [Info] RStride     : 124 bit
+[2021-07-20.00:33:10] [Info] Initializing GeForce GTX 1650
+[2021-07-20.00:33:10] [Info] Generating 16,777,216 starting points (640.0MB)
+[2021-07-20.00:33:15] [Info] 10.0%  20.0%  30.0%  40.0%  50.0%  60.0%  70.0%  80.0%  90.0%  100.0%
+[2021-07-20.00:33:25] [Info] Done
+[DEV: GeForce GTX 1650 3435/4096MB] [K: 9CA2365A12561A658624835BA2ADC0CB68000000 (160 bit), C: 22.370033 %] [I: A93D77EBBC8A07840546A2705CAB6C8 (124 bit), 9] [T: 1] [S: 453.69 MK/s] [384,886,112,256 (39 bit)] [00:16:07]
+```
+
 ## with xpoints file:
 For puzzle ```1``` to ```37``` with ```--stride``` of ```1```
 ```

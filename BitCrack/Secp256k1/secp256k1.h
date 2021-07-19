@@ -320,7 +320,7 @@ namespace secp256k1 {
 
 	static Random rnd;
 	uint256 getRandomRange(uint256 min, uint256 max);
-	uint256 getRandom64(int32_t bits, std::vector<uint32_t> &rStrideHistory);
+	uint256 getRandom128(int32_t bits, std::vector<uint32_t> &rStrideHistory);
 
 	const unsigned int _POINT_AT_INFINITY_WORDS[8] = { 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF };
 	const unsigned int _P_WORDS[8] = { 0xFFFFFC2F, 0xFFFFFFFE, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF };

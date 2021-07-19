@@ -50,7 +50,7 @@ KeyFinder::KeyFinder(const secp256k1::uint256& startKey, const secp256k1::uint25
 	_rStrideHistory.clear();
 
 	if (_randomStride)
-		_stride = secp256k1::getRandom64(_randomSrtrideBits, _rStrideHistory);
+		_stride = secp256k1::getRandom128(_randomSrtrideBits, _rStrideHistory);
 	//Logger::log(LogLevel::Info, "Counting by : " + _stride.toString() + " (" + std::to_string(_stride.getBitRange()) + " bit)");
 }
 
@@ -404,7 +404,7 @@ uint64_t KeyFinder::TZC(uint64_t x)
 
 void KeyFinder::reSetupEverything()
 {
-	_stride = secp256k1::getRandom64(_randomSrtrideBits, _rStrideHistory);
+	_stride = secp256k1::getRandom128(_randomSrtrideBits, _rStrideHistory);
 	//printf("\n");
 	//Logger::log(LogLevel::Info, "Counting by : " + _stride.toString() + " (" + std::to_string(_stride.getBitRange()) + " bit)");
 	_device->updateStride(_stride);

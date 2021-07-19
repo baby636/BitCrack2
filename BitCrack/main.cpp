@@ -17,7 +17,7 @@
 #include <gmp.h>
 #include <gmpxx.h>
 
-#define RELEASE "1.03"
+#define RELEASE "1.02"
 
 
 
@@ -159,14 +159,14 @@ void statusCallback(KeySearchStatus info)
 	const char* formatStr = NULL;
 
 	if (_config.follow) {
-		formatStr = "[DEV: %s %s/%sMB] [K: %s (%d bit), C: %lf %%] [I: %llX (%d bit), %lu] [T: %s] [S: %s] [%s (%d bit)] [%s]\n";
+		formatStr = "[DEV: %s %s/%sMB] [K: %s (%d bit), C: %lf %%] [I: %s (%d bit), %lu] [T: %s] [S: %s] [%s (%d bit)] [%s]\n";
 	}
 	else {
-		formatStr = "\r[DEV: %s %s/%sMB] [K: %s (%d bit), C: %lf %%] [I: %llX (%d bit), %lu] [T: %s] [S: %s] [%s (%d bit)] [%s] ";
+		formatStr = "\r[DEV: %s %s/%sMB] [K: %s (%d bit), C: %lf %%] [I: %s (%d bit), %lu] [T: %s] [S: %s] [%s (%d bit)] [%s] ";
 	}
 
 	printf(formatStr, devName.c_str(), usedMemStr.c_str(), totalMemStr.c_str(), info.nextKey.toString().c_str(),
-		info.nextKey.getBitRange(), getPercantage(info.nextKey), info.stride.toInt64(), info.stride.getBitRange(), 
+		info.nextKey.getBitRange(), getPercantage(info.nextKey), info.stride.toString().c_str(), info.stride.getBitRange(),
 		info.rStrideCount, targetStr.c_str(), speedStr.c_str(), totalStr.c_str(), 
 		secp256k1::uint256(_config.totalkeys + info.total).getBitRange(), timeStr.c_str());
 
@@ -247,7 +247,7 @@ void usage()
 	printf("                                 :+COUNT\n");
 	printf("                             Where START, END, COUNT are in hex format\n");
 	printf("--stride N                   Increment by N keys at a time\n");
-	printf("--rstride N                  Random stride bits, continue after end of range by setting up new random stride\n");
+	printf("--rstride N                  Random stride bits[1 to 128], continue after end of range by setting up new random stride\n");
 	printf("--share M/N                  Divide the keyspace into N equal shares, process the Mth share\n");
 	printf("--continue FILE              Save/load progress from FILE\n");
 	printf("-v, --version                Show version\n");
@@ -440,6 +440,11 @@ int run()
 	Logger::log(LogLevel::Info, "Starting at : " + _config.nextKey.toString() + " (" + std::to_string(_config.nextKey.getBitRange()) + " bit)");
 	Logger::log(LogLevel::Info, "Ending at   : " + _config.endKey.toString() + " (" + std::to_string(_config.endKey.getBitRange()) + " bit)");
 	Logger::log(LogLevel::Info, "Range       : " + _config.range.toString() + " (" + std::to_string(_config.range.getBitRange()) + " bit)");
+	if (_config.randomStride)
+		Logger::log(LogLevel::Info, "RStride     : " + util::format(_config.randomSrtrideBits) + " bit");
+	else
+		Logger::log(LogLevel::Info, "Stride      : " + _config.stride.toString());
+
 	//Logger::log(LogLevel::Info, "Counting by : " + _config.stride.toString() + " (" + std::to_string(_config.stride.getBitRange()) + " bit)");
 
 	try {

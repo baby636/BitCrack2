@@ -997,21 +997,20 @@ uint256 secp256k1::getRandomRange(uint256 min, uint256 max)
 	return result.add(min);
 }
 
-uint256 secp256k1::getRandom64(int32_t bits, std::vector<uint32_t>& rStrideHistory)
+uint256 secp256k1::getRandom128(int32_t bits, std::vector<uint32_t>& rStrideHistory)
 {
 	uint256 result;
 
-	if (bits > 64 || bits < 1) {
-		printf("uint256 wrong random bits\n");
-		exit(1);
+	if (bits > 128 || bits < 1) {
+		throw std::string("secp256k1::getRandom128: wrong random bits");
 	}
 
 	if (bits <= 32) {
+
 		uint32_t r = 0; // rnd.getChunk() | ((uint32_t)0x1UL << (bits - 1));
 
 		if (((uint64_t)0x1UL << bits) == rStrideHistory.size()) {
-			printf("Tried all possible value in %d bits for random stride\n", bits);
-			exit(0);
+			throw std::string("Tried all possible value in " + std::to_string(bits) + " bits for random stride");
 		}
 
 		do {
@@ -1031,35 +1030,38 @@ uint256 secp256k1::getRandom64(int32_t bits, std::vector<uint32_t>& rStrideHisto
 
 		rStrideHistory.push_back(r);
 	}
-	else {
-		uint32_t r1 = 0;
-		uint32_t r2 = 0;
+	else if (bits <= 64 && bits > 32) {
 
-		if (((uint64_t)0x1UL << bits) == rStrideHistory.size()) {
-			printf("Tried all possible value in %d bits for random stride\n", bits);
-			exit(0);
-		}
-
-		do {
-			r1 = rnd.getChunk() | ((uint32_t)0x1UL << (bits - 1));
-		} while (std::count(rStrideHistory.begin(), rStrideHistory.end(), r1) > 0);
-
-		do {
-			r2 = rnd.getChunk() | ((uint32_t)0x1UL << (bits - 1));
-		} while (std::count(rStrideHistory.begin(), rStrideHistory.end(), r2) > 0);
-		//printf("r = %lu, bits = %d\n", r, bits);
-
-		result.v[0] = r1;
-		result.v[1] = (uint32_t)((uint32_t)MASK32 >> (32 - (bits - 32))) & r2;
+		result.v[0] = rnd.getChunk();
+		result.v[1] = (uint32_t)((uint32_t)MASK32 >> (32 - (bits - 32))) & (rnd.getChunk() | ((uint32_t)0x1UL << (bits - 32 - 1)));
 		result.v[2] = 0UL;
 		result.v[3] = 0UL;
 		result.v[4] = 0UL;
 		result.v[5] = 0UL;
 		result.v[6] = 0UL;
 		result.v[7] = 0UL;
+	}
+	else if (bits <= 96 && bits > 64) {
 
-		rStrideHistory.push_back(r1);
-		rStrideHistory.push_back(r2);
+		result.v[0] = rnd.getChunk();
+		result.v[1] = rnd.getChunk();
+		result.v[2] = (uint32_t)((uint32_t)MASK32 >> (64 - (bits - 64))) & (rnd.getChunk() | ((uint32_t)0x1UL << (bits - 64 - 1)));
+		result.v[3] = 0UL;
+		result.v[4] = 0UL;
+		result.v[5] = 0UL;
+		result.v[6] = 0UL;
+		result.v[7] = 0UL;
+	}
+	else if (bits <= 128 && bits > 96) {
+
+		result.v[0] = rnd.getChunk();
+		result.v[1] = rnd.getChunk();
+		result.v[2] = rnd.getChunk();
+		result.v[3] = (uint32_t)((uint32_t)MASK32 >> (96 - (bits - 96))) & (rnd.getChunk() | ((uint32_t)0x1UL << (bits - 96 - 1)));;
+		result.v[4] = 0UL;
+		result.v[5] = 0UL;
+		result.v[6] = 0UL;
+		result.v[7] = 0UL;
 	}
 	return result;
 }
