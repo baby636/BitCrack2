@@ -451,8 +451,8 @@ BitCrack.exe -b 64 -t 256 -p 1024 --stride 1 -m xpoint --keyspace 1:1fffffffff -
 BitCrack is licensed under MIT License.
 
 ## Donation
-- BTC: bc1qwngus7cv3z45w3xnsxrwru9t705azg4a0mux0h
-- ETH: 0x48bD1aE2B289feDBcCcba0D1591E7f088752bd99
+- BTC: bc1qwnd4jqe0ulldr7rn8dk8mpkytm7jz068mpau9w
+- ETH: 0x16DD2B876C91d168cBAF7c18b78b9d0aDc011365
 
 ## __Disclaimer__
 ALL THE CODES, PROGRAM AND INFORMATION ARE FOR EDUCATIONAL PURPOSES ONLY. USE IT AT YOUR OWN RISK. THE DEVELOPER WILL NOT BE RESPONSIBLE FOR ANY LOSS, DAMAGE OR CLAIM ARISING FROM USING THIS PROGRAM.
